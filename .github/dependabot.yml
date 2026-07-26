@@ -7,6 +7,15 @@ updates:
       time: "03:15"
       timezone: Asia/Riyadh
     open-pull-requests-limit: 5
+    # Keep incompatible toolchain majors out of grouped automatic PRs.
+    # Revisit these after Next.js/typescript-eslint explicitly support them.
+    ignore:
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       production-dependencies:
         dependency-type: production
