@@ -11,6 +11,8 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    // Vendored ONNX Runtime bridge binaries copied from the lockfile-pinned package.
+    "public/onnx/**",
     "next-env.d.ts",
   ]),
 ]);

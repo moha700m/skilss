@@ -1,0 +1,88 @@
+name: Sync upstream skills
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+    - cron: "43 14 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: sync-upstream-skills
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out the hub
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Clone the upstream catalog
+        run: git clone --depth 1 https://github.com/ComposioHQ/awesome-claude-skills.git "$RUNNER_TEMP/awesome-claude-skills"
+
+      - name: Generate catalog metadata
+        run: node scripts/sync-skills.mjs --source "$RUNNER_TEMP/awesome-claude-skills"
+
+      - name: Test the parser
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit a successful sync
+        shell: bash
+        run: |
+          if git diff --quiet -- src/data && [ -z "$(git ls-files --others --exclude-standard -- src/data)" ]; then
+            echo "Upstream metadata is already current."
+            exit 0
+          fi
+
+          git diff --check -- src/data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- src/data/skills.generated.json src/data/snapshot.generated.json
+          git diff --cached --check
+          git commit -m "chore(data): sync upstream skills"
+          git push
+
+      - name: Open one actionable issue if the sync fails
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          title="chore: automated upstream sync needs attention"
+          existing="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "The scheduled sync failed again: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          else
+            gh issue create \
+              --title "$title" \
+              --body "The keyless daily catalog sync failed. Inspect the run, fix the underlying test/build issue, then rerun the workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          fi
