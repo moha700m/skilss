@@ -1,0 +1,5 @@
+{
+  "tool": "agent-reach",
+  "operation": "rss",
+  "url": "https://hnrss.org/frontpage"
+}
