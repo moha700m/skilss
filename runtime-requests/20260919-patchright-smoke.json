@@ -1,0 +1,5 @@
+{
+  "tool": "patchright-enhanced",
+  "url": "https://example.com",
+  "selector": "h1"
+}
